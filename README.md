@@ -64,11 +64,9 @@ The data was collected in 2016, which means it is not very current. The trends f
 
 ## Report
 
-To view the full interactive HTML report:  
+To view the full interactive HTML report with visualisations:  
 [CaseStudyMarkdown.html](https://naska23.github.io/marketing-strategy-project/CaseStudyMarkdown.html)
 
-To view the full Rmd report:
-[CaseStudyMarkdown.Rmd](CaseStudyMarkdown.Rmd)
 
 
 ---

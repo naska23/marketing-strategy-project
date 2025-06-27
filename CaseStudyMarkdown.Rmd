@@ -1,0 +1,474 @@
+---
+title: "Case Study - Recommendations for Marketing Strategy"
+author: "Naska Kvarantan"
+date: "2023-11-27"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## The mission statement
+
+Bellabeat is a high tech manufacturer of health-focused products for women, which include a Bellabeat App, smart watch, smart wellness tracker and a smart water bottle. These products provide their users with data related to their activity, sleep, stress, menstrual cycle and mindfulness habits. They want to analyse fitness data of non-Bellabeat smart device users in order to gain insight into how consumers are using their smart devices. Using this information the company would like to recieve high – level recomendations for Bellabeat's marketing strategy. 
+
+Key questions for the analysis: 
+
+1.	What are some trends in smart device usage? 
+2.	How could these trends apply to Bellabeat customers? 
+3.	How could these trends help influence Bellabeat marketing strategy? 
+
+## Ask
+
+Business task
+
+The business task at hand is to identify trends in non-Bellabeat smart device usage to identify trends and insights that can be applied to Bellabeat's products. Finally, these findings will be used to formulate recommendations for Bellabeat's marketing strategy. 
+
+Stakeholders
+
+-	Urška Sršen, Bellabeat's cofounder and Chief Creative Officer
+-	Sando Mur, Bellabeat's cofounder and key member of the Bellabeat executive team
+-	Bellabeat marketing analytics team
+
+## Prepare
+
+### Data Source
+
+The dataset used for the analysis was retrieved from [FitBit Fitness Tracker Data](https://www.kaggle.com/datasets/arashnic/fitbit/discussion/371426) (CC0: Public Domain)
+
+The dataset contains personal fitness tracking data from thirty Fitbit users. The data includes personal tracker-data, including minute-level output for physical activity, heart rate, and sleep monitoring. Furthermore, it includes information about daily activity, steps, and heart rate. The data was collected from 12.4.2016 to 12.5.2016. 
+
+The dataset is comprised of 18 .csv files. 
+
+### Limitations of the data
+
+Upon first review of the data, there are some limitations that are important to consider: 
+
+1. FitBit data does not include information about gender and age. Since Bellabeat is targeting mainly women with their products, this is an important factor to keep in mind when making recommendations based on this data.
+
+2. The dataset may exhibit some bias since all participants were volunteers, they were not randomly selected from a wide population of FitBit users. Thus, the entire population of FitBit users might not be reflected in this sample. 
+
+3. The data was collected in 2016, which means it is not very current. The trends from 2016 might not be applicable to 2023. 
+
+## Process
+
+### Data Cleaning Process
+
+Data cleaning was done in RStudio. I started by installing a few useful packages. 
+
+```{r Packages installed, eval = FALSE}
+# Set a CRAN mirror
+options(repos = c(CRAN = "https://cloud.r-project.org"))
+
+# Install and load the required packages
+
+install.packages("tidyverse")
+library(tidyverse)
+install.packages("lubridate")
+library(lubridate)
+install.packages("dplyr")
+library(dplyr)
+```
+
+Then I imported the data to analyse. For this case study, I decided to use a subset of the 18 files available. 
+
+```{r Data Import}
+DailyActivity <- read.csv("/Users/oblj-nkvarantan/Documents/CASE STUDY /Kaggle Case Study Data_Untouched/Fitabase Data 4.12.16-5.12.16/Ready Data Frames/dailyActivity_merged_Ready.csv")
+Heartrate <- read.csv("/Users/oblj-nkvarantan/Documents/CASE STUDY /Kaggle Case Study Data_Untouched/Fitabase Data 4.12.16-5.12.16/Ready Data Frames/heartrate_seconds_merged_Ready.csv")
+HourlyCalories <- read.csv("/Users/oblj-nkvarantan/Documents/CASE STUDY /Kaggle Case Study Data_Untouched/Fitabase Data 4.12.16-5.12.16/Ready Data Frames/hourlyCalories_merged_Ready.csv")
+HourlyIntensities <- read.csv("/Users/oblj-nkvarantan/Documents/CASE STUDY /Kaggle Case Study Data_Untouched/Fitabase Data 4.12.16-5.12.16/Ready Data Frames/hourlyIntensities_merged_Ready.csv")
+MinuteSleep <- read.csv("/Users/oblj-nkvarantan/Documents/CASE STUDY /Kaggle Case Study Data_Untouched/Fitabase Data 4.12.16-5.12.16/Ready Data Frames/minuteSleep_merged_Ready.csv")
+DailySleep <- read.csv("/Users/oblj-nkvarantan/Documents/CASE STUDY /Kaggle Case Study Data_Untouched/Fitabase Data 4.12.16-5.12.16/Ready Data Frames/sleepDay_merged_Ready.csv")
+```
+
+
+Then, I used the str() function to check if all the variables were in the correct datatype. I noticed that the date column included both the date and time variables, which I didn't like. I split the column into two separate columns: Date and Time. While doing this I also changes the time format to 24h in order to remove AM/PM, and the dates from mm/dd/yyyy to yyyy/mm/dd format. Since the date columns were not the correct datatype - they were strings, I had to convert the strings to dates.
+
+Example of process: 
+
+```{r eval=FALSE}
+HeartRate <- read.csv(".../Documents/CASE STUDY /Kaggle Case Study Data_Untouched/Fitabase Data 4.12.16-5.12.16/heartrate_seconds_merged.csv")
+
+HeartRate$Time <- as.POSIXct(HeartRate$Time, format = "%m/%d/%Y %I:%M:%S %p")
+
+HeartRate <- HeartRate %>%
+  mutate(
+    Date = as.Date(Time),
+    Time = format(Time, format = "%H:%M:%S")
+  ) %>%
+  select(Id, Date, Time, Value)
+
+write.csv(HeartRate, "/.../Documents/CASE STUDY /Kaggle Case Study Data_Untouched/Fitabase Data 4.12.16-5.12.16/heartrate_seconds_merged_Ready.csv", row.names = FALSE)
+
+```
+
+Secondly, I checked for missing values. 
+
+Thirdly, I used the summary() function to check the max/min points, means and median for each relevant variable, to see if there are big deviations. I noticed that in the DailyActivity data set, there were some values that did not make any sense. The Calories column shows the amount of calories burned in a day for each participant, including Basal Metabolic Rate (BMR). Therefore, I decided to drop all entries that had a value of 0, since it is impossible that the BMR alone would amount to 0. Next, I noticed there are more values which were very unlikely, so I decided to check for outliers in the Calories column with a boxplot: 
+
+
+```{r eval=FALSE}
+boxplot(DailyActivity$Calories,
+        ylab = "Calories", col="#20C4BC"
+)
+
+boxplot.stats(DailyActivity$Calories)$out
+```
+
+![](/Users/oblj-nkvarantan/Documents/CASE STUDY /Kaggle Case Study Data_Untouched/Fitabase Data 4.12.16-5.12.16/ScriptsR/BoxPlotCalories.jpeg)
+
+Based on the boxplot and based on it being very unlikely that someone would burn less than 500 kcal in one day (due to the included BMR measurements), I decided to drop all values below 500 kcal from the DailyActivity dataset, because it means either the measurements weren't collected for the whole day or something went wrong.In both cases, the values for other variables are probably also not going to be accurate.
+
+With my data cleaned and prepared I moved to the analysis phase. 
+
+## Analyse
+
+Let's first do a summary of the data that I'll be using for the analysis. 
+
+```{r}
+summary(DailyActivity)
+```
+
+- From a first glance at the data, we can see that the average day of steps per day is 7698. 
+- On average 21.38 minutes in a day were spent doing very active activity, 13.56 minutes of fairly active activity and 192.8 minutes of lightly active minutes. Most of the active time was spent doing light activity.
+- Participants were sedentary for the majority of their day (991.2 min = 16.52 h). 
+
+```{r}
+summary(Heartrate)
+```
+The average heart rate of all participants in one month was 77.33.
+
+FitBit measures sleep which is divided into 3 sleep states: asleep (1), restless (2) and awake (3). In order to find out the frequency of each sleep states, we have to count how many times each appears. 
+
+```{r}
+table(MinuteSleep$value)
+
+```
+
+ The participants spend 91.49% of their sleep sleeping, 7.44% of their sleep was restless, and 1.07% was spent awake.
+
+```{r}
+summary(DailySleep)
+```
+On average the participants slept approx. 7 hours a day. 
+
+```{r}
+summary(HourlyIntensities)
+```
+After a quick look at the data, there are a few questions I want to explore: 
+
+1. During which part of the day and which day of the week do people tend to exercise the most? 
+2. How does the level of activity correlate to calories burned?
+3. Does the level of activity in a day influence sleep?
+4. Does average heart rate compare to activity level? 
+
+I will first focus on some aspects of the data to see if there are any trends that I can identify. It might be interesting to focus more on physical activity, sleep and heart rate.  
+
+### Data about physical activity (intenisity, steps)
+
+```{r eval=FALSE}
+HourlyIntensities %>%
+  select(TotalIntensity, AverageIntensity) %>%
+  summary()
+
+Average_Intensity_Hour <- HourlyIntensities %>%
+  group_by(Time) %>%
+  summarise(AverageIntensity = mean(AverageIntensity))
+
+ggplot(data=Average_Intensity_Hour) +
+  geom_col(mapping = aes(x=Time, y=AverageIntensity, fill=AverageIntensity)) +
+  theme(axis.text.x = element_text(angle = 90))+
+  labs(title = "Average intensity per hour")
+```
+
+![](/Users/oblj-nkvarantan/Documents/CASE STUDY /Kaggle Case Study Data_Untouched/Fitabase Data 4.12.16-5.12.16/ScriptsR/Average_intensity_per_hour.jpeg)
+
+From the graph we see a noticeable spike in average physical activity intensity between 17:00 and 19:00. Which makes sense since a lot of people work shifts from 09:00 to 17:00 and after that they might go to their preferred methods of physical activity.
+
+But let's have a look if the average intensities differed between days in the week.
+
+```{r eval = FALSE}
+HourlyIntensities$DayOfWeek <- factor(HourlyIntensities$DayOfWeek, levels = c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"))
+
+plots <- HourlyIntensities %>%
+  ggplot(aes(x = hour(Time), y = AverageIntensity, group = DayOfWeek, fill=DayOfWeek)) +
+  geom_col() +
+  scale_fill_manual(values = week_day_colors_7) +
+  facet_wrap(~ DayOfWeek, scales = 'free_y') +
+  labs(title = "Hourly Average Intensity for Each Day of the Week",
+       x = "Hour of the Day",
+       y = "Average Intensity") +
+  theme_minimal()
+
+print(plots)
+```
+
+![](/Users/oblj-nkvarantan/Documents/CASE STUDY /Kaggle Case Study Data_Untouched/Fitabase Data 4.12.16-5.12.16/ScriptsR/hourly_average_intensity_day_week.jpeg)
+
+From the graphs above it is clear that the distribution of hourly intensities is not the same for week days and weekend days. It is interesting to note that graphs for Monday, Tuesday, Wednesday and Friday look quite similar, with the highest average intensity being observed from 17:00 to 19:00. However, the average intensity recorded was highest on Tuesday, Wednesday and Saturday.  
+
+Next, I'll look at the difference in the level of physical activity throughout the week. 
+
+```{r eval = FALSE}
+DailyIntensities <- mutate(DailyIntensities, DayOfWeek = weekdays(Date))
+
+weekly_summary_intensities <- DailyIntensities %>%
+  group_by(DayOfWeek) %>%
+  summarise(AvgSedentaryMinutes = mean(SedentaryMinutes), AvgLightlyActiveMinutes = mean(LightlyActiveMinutes), AvgFairlyActiveMinutes = mean(FairlyActiveMinutes), AvgVeryActiveMinutes = mean(VeryActiveMinutes))
+
+weekly_summary_intensities$DayOfWeek <- factor(weekly_summary$DayOfWeek, levels = c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"))
+ 
+plot1 <- ggplot(weekly_summary_intensities, aes(x = DayOfWeek, y = AvgSedentaryMinutes, fill = AvgSedentaryMinutes)) +
+  geom_col(fill="#BE93C5") +
+  theme(axis.text.x = element_text(angle = 90))+
+  labs(title = "Sedentary Minutes", x="", y="Minutes")
+
+plot2 <- ggplot(weekly_summary_intensities, aes(x = DayOfWeek, y = AvgLightlyActiveMinutes, fill = AvgLightlyActiveMinutes)) +
+  geom_col(fill = "#A7A3C7") +
+  theme(axis.text.x = element_text(angle = 90))+
+  labs(title = "Lightly Active Minutes", x="", y="Minutes")
+
+plot3 <- ggplot(weekly_summary_intensities, aes(x = DayOfWeek, y = AvgFairlyActiveMinutes, fill = AvgFairlyActiveMinutes)) +
+  geom_col(fill="#91B4C9") +
+  theme(axis.text.x = element_text(angle = 90))+
+  labs(title = "Fairly Active Minutes",  x="", y="Minutes")
+
+plot4 <- ggplot(weekly_summary_intensities, aes(x = DayOfWeek, y = AvgVeryActiveMinutes, fill = AvgVeryActiveMinutes)) +
+  geom_col(fill="#7BC6CC") +
+  theme(axis.text.x = element_text(angle = 90))+
+  labs(title = "Very Active Minutes",  x="", y="Minutes")
+
+# Arrange plots side by side
+grid.arrange(plot1, plot2, plot3, plot4, ncol = 2)
+```
+
+![](/Users/oblj-nkvarantan/Documents/CASE STUDY /Kaggle Case Study Data_Untouched/Fitabase Data 4.12.16-5.12.16/ScriptsR/daily_intensity_weekday.jpeg)
+
+We can observe that sedentary minutes do not vary much throughout the week. But we do see that our participants were slightly less sedentary on average on Thursdays and Fridays. Furthermore, our participants spent more minutes being very active on Mondays and Tuesdays. 
+
+Next, I wanted to see the mean daily activity level of our participants. 
+
+```{r eval=FALSE}
+sum_sedentary <- sum(DailyActivity$SedentaryMinutes)
+sum_lightly <- sum(DailyActivity$LightlyActiveMinutes)
+sum_fairly <- sum(DailyActivity$FairlyActiveMinutes)
+sum_very <- sum(DailyActivity$VeryActiveMinutes)
+total <- sum(DailyActivity$SedentaryMinutes)+sum(DailyActivity$LightlyActiveMinutes)+sum(DailyActivity$FairlyActiveMinutes)+sum(DailyActivity$VeryActiveMinutes)
+
+col1 <- c("Sedentary", "Lightly Active", "Fairly Active", "Very Active")
+col2 <- c(sum_sedentary/total*100, sum_lightly/total*100, sum_fairly/total*100, sum_very/total*100)
+
+ActivityLevel <- data.frame(Activity_Level = col1, Percentage = col2)
+ActivityLevel$Activity_Level <- factor(ActivityLevel$Activity_Level, levels = c("Sedentary", "Lightly Active", "Fairly Active", "Very Active"))
+
+ggplot(data=ActivityLevel, aes(x= Activity_Level, y = Percentage, fill = Activity_Level))+
+  geom_col()+
+  geom_text(aes(label =sprintf("%.1f%%", Percentage)), vjust = -0.5, color = "black")+
+  scale_fill_manual(values = user_type_colors) +
+  theme(legend.position = "none")+
+  labs(title= "Activity Level", x = "", y= "Percentage")
+```
+
+![](/Users/oblj-nkvarantan/Documents/CASE STUDY /Kaggle Case Study Data_Untouched/Fitabase Data 4.12.16-5.12.16/ScriptsR/Activity_level_percentage.jpeg)
+
+According to their data, it seems that on average people were sedentary for 81.2 % of their day, 15.9 % of the day being lightly active, 1.1 % of the day being fairly active and 1.7 % of the day being very active. 
+
+Next, I'll be looking into the daily step count. From the summary of the DailyActivity data set above I saw that the average daily step count was 7698. In order to have a better understanding of the distribution of the daily steps of our participants I decided to first divide them into 5 categories: < 2000 steps, between 2000 and 5000 steps, between 5000 and 10.000 steps, between 10.000 and 15.000 steps and more than 15.000 steps.  
+
+```{r eval = FALSE}
+StepCategory_5 <- DailyActivity %>%
+  mutate(
+    Step_Category_5 = case_when(
+      TotalSteps < 2000 ~ "< 2k Steps", 
+      TotalSteps >= 2000 & TotalSteps < 5000 ~ "2k - 5k Steps", 
+      TotalSteps >= 5000 & TotalSteps < 10000 ~ "5k - 10k Steps", 
+      TotalSteps >= 10000 & TotalSteps < 15000 ~ "10k - 15k Steps", 
+      TotalSteps >= 15000 ~ "> 15k Steps")
+  ) %>%
+  select(Id, Step_Category_5) %>%
+  count(Step_Category_5) %>%
+  group_by(Step_Category_5) %>%
+  arrange(desc(n))
+print(StepCategory_5)
+
+StepCategory_5$Step_Category_5 <- factor(StepCategory_5$Step_Category_5, levels = c("< 2k Steps", "2k - 5k Steps", "5k - 10k Steps", "10k - 15k Steps", "> 15k Steps"))
+
+colors_step_cat_5 <- c("< 2k Steps" = "#D66891", "2k - 5k Steps" = "#B87EA6", "5k - 10k Steps" = "#9A95BA", "10k - 15k Steps" = "#7CACCF", "> 15k Steps" = "#5FC3E4")
+
+StepCategory_5 %>%
+  group_by(Step_Category_5) %>%
+  summarise(total = n) %>%
+  mutate(totals = sum(total)) %>%
+  group_by(Step_Category_5) %>%
+  summarise(total_percent = total/totals) %>%
+  ggplot(aes(Step_Category_5, y=total_percent, fill=Step_Category_5))+
+  geom_col(show.legend = FALSE)+
+  geom_text(aes(label = scales :: percent(total_percent)), position = position_stack(vjust = 0.5), color = "black")+
+  scale_fill_manual(values = colors_step_cat_5)+
+  scale_y_continuous(labels = scales::percent) +
+  labs(title="Daily Percentage of Steps per Category", x="", y= "Percentage")
+
+```
+
+![](/Users/oblj-nkvarantan/Documents/CASE STUDY /Kaggle Case Study Data_Untouched/Fitabase Data 4.12.16-5.12.16/ScriptsR/Daily Percentage of Steps per Category.jpeg) 
+
+From the graph above it's pretty clear that the majority of our participants took between 5000 and 10.000 steps per day. Interestingly, the second most frequent number of steps was between 10.000 and 15.000 steps per day. Research on this topic suggests that healthy adults (aged 20 - 50 years) can take anywhere between 4000 and 18.000 steps/day, and that 10.000 steps/day is a reasonable target (Source: [Locke et al., 2011](https://ijbnpa.biomedcentral.com/articles/10.1186/1479-5868-8-79). 
+
+#### How does the level of activity correlate to calories burned? 
+
+Here I decided to look into the relationship between activity intensity and calories burned. 
+
+```{r eval = FALSE}
+HourlyIntensitiesxHourlyCalories <- merge(HourlyIntensities, HourlyCalories, by=c('Id', 'Date', 'Time'))
+head(HourlyIntensitiesxHourlyCalories)
+
+ggplot(data=HourlyIntensitiesxHourlyCalories, aes(x= AverageIntensity, y = Calories))+
+  geom_point(color="#4a7384")+
+  geom_smooth(method = "lm")+
+  labs(title= "Average Hourly Intensity vs. Calories Burned", x = "Average Intensity", y= "Calories Burned")+
+  annotate("text", x=2,y=875,label="r = 0.90", color="#4a7384", fontface="bold", size=4.5)
+
+```
+
+![](/Users/oblj-nkvarantan/Documents/CASE STUDY /Kaggle Case Study Data_Untouched/Fitabase Data 4.12.16-5.12.16/ScriptsR/Average Hourly Intensity vs. Calories Burned.jpeg)
+
+In the scatterplot above, a positive correlation can be observed between the amount of calories burned and the intensity of physical activity, which is to be expected. The higher the intensity of the activity, the more calories were burned. 
+
+#### Can a similar trend be observed with data for daily step count? 
+
+Based on the study quoted above I decided to form 4 activity levels, which would match those of the FitBit measurements: Sedentary, Lightly Active, Fairly Active and Very Active. I decided that anything under 4000 steps/day would be labelled as Sedentary; between 4000 and 8000 steps/day would be Lightly Active; between 8000 and 12000 steps/day would be Fairly Active and everything above 12000 steps/day would be Very Active. Next, I compared the level of activity with the calories burned. 
+
+```{r eval = FALSE}
+DailyActivity2 <- DailyActivity %>%
+  mutate(
+  DailyActivityLevel = case_when(
+    TotalSteps < 4000 ~ "Sedentary", 
+    TotalSteps >= 4000 & TotalSteps < 8000 ~ "Lightly Active", 
+    TotalSteps >= 8000 & TotalSteps < 12000 ~ "Fairly Active", 
+    TotalSteps >= 12000 ~ "Very Active"
+    )
+  )
+
+DailyActivity2$DailyActivityLevel <- factor(DailyActivity2$DailyActivityLevel, levels = c("Sedentary", "Lightly Active", "Fairly Active", "Very Active"))
+
+ggplot(data=DailyActivity2, aes(x = DailyActivityLevel, y = Calories, fill = DailyActivityLevel)) +
+  geom_boxplot() +
+  scale_fill_manual(values = daily_activity_colors) +
+  theme(legend.position = "none") +
+  labs(title = "Daily Activity Level vs. Calories Burned", x = "Daily Activity Level", y= "Calories Burned")
+
+daily_activity_colors <- c("Sedentary" = "#BE93C5", "Lightly Active" = "#A7A3C7", "Fairly Active" = "#91B4C9", "Very Active" = "#7BC6CC")
+```
+
+![](/Users/oblj-nkvarantan/Documents/CASE STUDY /Kaggle Case Study Data_Untouched/Fitabase Data 4.12.16-5.12.16/ScriptsR/DailyActivityLevel vs Calories.jpeg)
+
+It is clear that the number of calories burned per day increases with the level of activity, which is defined by the number of steps taken per day.
+
+### Data about sleep
+
+#### How does the level of activity affect sleep?
+
+To look into this, I first had to merge two datasets together: DailyActivity and DailySleep. Next, I had to remove the 0 values in the lightly, fairly and very active minutes columns.  
+
+```{r eval=FALSE}
+ActivityxSleep <- merge(DailyActivity, DailySleep, by=c('Id', 'Date'))
+head(ActivityxSleep)
+
+ActivityxSleep_NZV_lightly <- ActivityxSleep %>% # NZV = no zero values for the lightly active minutes
+  filter(LightlyActiveMinutes != 0)
+
+ActivityxSleep_NZV_fairly <- ActivityxSleep %>% # NZV = no zero values for the fairly active minutes
+  filter(FairlyActiveMinutes != 0)
+
+ActivityxSleep_NZV_very <- ActivityxSleep %>% # NZV = no zero values for the very active minutes
+  filter(VeryActiveMinutes != 0)
+
+Sedentary_plot <- ggplot(ActivityxSleep, aes(x = TotalMinutesAsleep, y = SedentaryMinutes)) +
+  geom_point(color ="#42047E") +
+  scale_fill_manual(values = "#42047E") +
+  geom_smooth(method = "lm", se=FALSE, color = "blue") +
+  labs(
+    x = "Total Minutes Asleep",
+    y = "Sedentary Minutes"
+  ) +
+  theme_minimal()
+
+Lightly_active_plot <- ggplot(ActivityxSleep_NZV_lightly, aes(x = TotalMinutesAsleep, y = LightlyActiveMinutes)) +
+  geom_point(color = "#07F49E") +
+  scale_fill_manual(values= "#07F49E") +
+  geom_smooth(method = "lm", se=FALSE, color = "blue") +
+  labs(
+    x = "Total Minutes Asleep",
+    y = "Lightly Active Minutes"
+  ) +
+  theme_minimal()
+
+Fairly_active_plot <- ggplot(ActivityxSleep_NZV_fairly, aes(x = TotalMinutesAsleep, y = FairlyActiveMinutes)) +
+  geom_point(color = "#247C8E") +
+  scale_fill_manual(values = "#247C8E" ) +
+  geom_smooth(method = "lm", se=FALSE, color = "blue") +
+  labs(
+    x = "Total Minutes Asleep",
+    y = "Fairly Active Minutes"
+  ) +
+  theme_minimal()
+
+Very_active_plot <- ggplot(ActivityxSleep_NZV_very, aes(x = TotalMinutesAsleep, y = VeryActiveMinutes)) +
+  geom_point(color = "#10CB98") +
+  scale_fill_manual(values = "#10CB98") +
+  geom_smooth(method = "lm", se=FALSE, color = "blue") +
+  labs(
+    x = "Total Minutes Asleep",
+    y = "Very Active Minutes"
+  ) +
+  theme_minimal()
+
+grid.arrange(Sedentary_plot, Lightly_active_plot, Fairly_active_plot, Very_active_plot, ncol = 2)
+```
+
+![](/Users/oblj-nkvarantan/Documents/CASE STUDY /Kaggle Case Study Data_Untouched/Fitabase Data 4.12.16-5.12.16/ScriptsR/sleep_activity.jpeg)
+
+In the first scatterplot we can see that on average the more sedentary the participants were, the less they slept. Whereas, in the other three scatterplots we can't really see a clear influence of activity level on time slept.
+
+### Data about Heartrate
+
+```{r eval=FALSE}
+# Create a heatmap
+heatmap_plot <- Heartrate %>%
+  mutate(Hour = format(DateTime, "%H"), Minute = format(DateTime, "%M")) %>%
+  group_by(Hour, Minute) %>%
+  summarize(AverageHeartRate = mean(Value)) %>%
+  ggplot(aes(x = Hour, y = Minute, fill = AverageHeartRate)) +
+  geom_tile() +
+  scale_fill_gradient(low = "white", high = "red") +
+  labs(title = "Heart Rate", x = "Hour", y = "Minute", fill = "Average Heart Rate") +
+  theme_minimal()
+
+# Print the heatmap
+print(heatmap_plot)
+
+```
+
+![](/Users/oblj-nkvarantan/Documents/CASE STUDY /Kaggle Case Study Data_Untouched/Fitabase Data 4.12.16-5.12.16/ScriptsR/HeatMap Heartrate.jpeg)
+
+From the heat map above we can see that the highest heart rate was observed between 17:00 and 19:00 coinciding with activity intensity data which showed that participants tend to be more active between those hours. 
+
+## Share 
+
+### Recommendations: 
+
+
+1. Bellabeat can use the information about the users' activity levels and trends during the day/week to send targeted notifications through their app. For example, since we observed that users tend to do more intense physical activity from 17:00 to 19:00 in the day, the app can remind its users a little before 17:00 to do some high intensity physical activity. Furthermore, the app could track the weekly physical activity level of users in order to define their average level of physical activity. Then they could send different notifications/reminders to users of different physical activity levels to make it more personal. Studies [Source: Blair et al., 2013](https://www.tandfonline.com/doi/abs/10.1080/02701367.1996.10607943) have shown that any level of physical activity can reduce the risk of clinical diseases. While, some activities (and with that intensities) are better for the overall prevention of these diseases, any level of physical activity, be it low or moderate intensity, is better than remaining sedentary. Due to the risk of a sedentary life, it should be one of the priorities to try and minimise it. From the results above, we saw that a big part of the users' day was spent being sedentary, so it would be a great idea to try and motivate those users to do more low to moderate activities throughout the day.
+
+2. Bellabeat can use the information about users' daily step count to motivate its users to reach their daily goals. I think it would be wise to set a default step goal of 10.000 steps per day, but give users the option to customize it. It could be a good idea, to limit the notifications/reminders about the step count to one per day, as to not overwhelm users. 
+
+3. For those users whose goal it is to lose weight, the Bellabeat app could send friendly reminders to engage in high intensity physical activities more often, as we have seen that there is a clear correlation between higher intensity physical activity and burned calories. 
+
+
+### Conclusion
+
+It is clear that people use fitness tracking devices for different purposes, so the possibility to customize the goals/aims, daily steps, sleep times, etc. should be a priority and definitely one of the main pillars of the marketing strategy. Furthermore, the Bellabeat app could include a food diary connected to a nutrient database, enabling users to monitor their food consumption and nutrient intake, both very important for a healthy lifestyle. 
+
